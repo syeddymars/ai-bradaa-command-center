@@ -1,0 +1,13 @@
+# netlify.toml
+
+[build]
+  # Your functions directory is where the ai-handler lives.
+  functions = "netlify/functions/"
+  
+  # Your site is static. The root directory is what we publish.
+  publish = "."
+
+# Since there is no frontend framework to build, we can leave the command
+# empty. This prevents Netlify from running unnecessary build processes.
+# This is a key step in saving your build minutes.
+command = ""

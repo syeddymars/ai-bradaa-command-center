@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Bradaa Strategic Command v10.1 [CORRECTED]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#010409">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <style>
+        :root {
+            --c-bg: #010409;
+            --c-glass: rgba(13, 17, 23, 0.6);
+            --c-border: rgba(48, 54, 61, 0.8);
+            --c-glow: rgba(0, 240, 255, 0.7);
+            --c-accent-pink: #D83F87;
+            --c-accent-cyan: #00F0FF;
+            --c-text-primary: #E6EDF3;
+            --c-text-secondary: #A8B2CC;
+            --font-display: 'Orbitron', sans-serif;
+            --font-body: 'Share Tech Mono', monospace;
+        }
+        body { font-family: var(--font-body); background-color: var(--c-bg); color: var(--c-text-primary); }
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw; height: 100vh;
+            background-image:
+                radial-gradient(circle at 10% 20%, var(--c-accent-cyan), transparent 30%),
+                radial-gradient(circle at 90% 80%, var(--c-accent-pink), transparent 30%),
+                radial-gradient(circle at 50% 50%, #4A00E0, transparent 40%);
+            background-size: 200% 200%; filter: blur(100px); opacity: 0.15; z-index: -1;
+            animation: aurora 25s linear infinite;
+        }
+        @keyframes aurora { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .font-display { font-family: var(--font-display); text-shadow: 0 0 5px var(--c-accent-cyan), 0 0 10px var(--c-accent-cyan); }
+        .card { background-color: var(--c-glass); backdrop-filter: blur(24px); border: 1px solid var(--c-border); border-radius: 0.75rem; position: relative; overflow: hidden; }
+        .card::before {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 200%; height: 200%; z-index: 0;
+            background: conic-gradient(from 180deg at 50% 50%, var(--c-accent-cyan), var(--c-accent-pink), var(--c-accent-cyan));
+            transform: translate(-50%, -50%); opacity: 0; transition: opacity 0.5s ease-in-out; animation: rotate 8s linear infinite;
+        }
+        .card:hover::before { opacity: 0.5; }
+        @keyframes rotate { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+        .card-content { position: relative; z-index: 1; padding: 1.5rem; }
+        .nav-sticky { position: sticky; top: 0; z-index: 50; background-color: rgba(1, 4, 9, 0.7); backdrop-filter: blur(12px); border-bottom: 1px solid var(--c-border); }
+        .nav-button { border-bottom: 2px solid transparent; transition: all 0.3s; }
+        .nav-button:hover, .nav-button.active { color: var(--c-accent-cyan); border-bottom-color: var(--c-accent-cyan); text-shadow: 0 0 5px var(--c-accent-cyan); }
+        .filter-button.active { background-color: var(--c-accent-pink); border-color: var(--c-accent-pink); color: var(--c-text-primary); }
+        .tool-selector-btn { text-align: left; width: 100%; padding: 0.75rem; border-radius: 0.375rem; transition: all 0.2s; border: 1px solid transparent;}
+        .tool-selector-btn:hover { background-color: var(--c-border); }
+        /* FIX: Visually impactful active state for toolkit button */
+        .tool-selector-btn.active {
+            background-color: var(--c-accent-cyan);
+            color: var(--c-bg);
+            border-color: var(--c-accent-cyan);
+            font-weight: bold;
+            box-shadow: 0 0 8px var(--c-accent-cyan), 0 0 16px rgba(0, 240, 255, 0.5);
+        }
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: var(--c-accent-cyan); }
+        select, input, textarea { font-family: var(--font-body); background-color: rgba(1, 4, 9, 0.8); border: 1px solid var(--c-border); border-radius: 0.375rem; padding: 0.65rem; }
+        .action-button { background-color: var(--c-accent-pink); color: white; padding: 0.65rem 1.5rem; font-weight: bold; border-radius: 0.375rem; transition: opacity 0.2s; cursor: pointer; } .action-button:hover { opacity: 0.9; }
+        section { padding-top: 6rem; margin-top: -5rem; }
+        .gemini-output { white-space: pre-wrap; line-height: 1.7; }
+
+        /* FIX: Toolkit Animation */
+        @keyframes consoleFadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .console-animating > * {
+            animation: consoleFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+    </style>
+
+<script>
+// Safety net: reroute any legacy endpoints to the single ai-handler
+(function() {
+  const _fetch = window.fetch;
+  window.fetch = function(input, init) {
+    let url = typeof input === 'string' ? input : input.url;
+    const lower = (url || '').toLowerCase();
+    function ensureInit(i){ return i || {}; }
+    function ensureHeaders(h){ return Object.assign({'Content-Type':'application/json'}, h||{}); }
+    if (lower.includes('/.netlify/functions/getmarketintel')) {
+      const body = (init && init.body) ? JSON.parse(init.body) : {};
+      init = ensureInit(init);
+      init.method = 'POST';
+      init.headers = ensureHeaders(init.headers);
+      init.body = JSON.stringify(Object.assign({ task: 'getMarketIntel' }, body));
+      url = '/.netlify/functions/ai-handler';
+    } else if (lower.includes('/.netlify/functions/getfutureintel')) {
+      const body = (init && init.body) ? JSON.parse(init.body) : {};
+      init = ensureInit(init);
+      init.method = 'POST';
+      init.headers = ensureHeaders(init.headers);
+      init.body = JSON.stringify(Object.assign({ task: 'getFutureIntel' }, body));
+      url = '/.netlify/functions/ai-handler';
+    } else if (lower.includes('/.netlify/functions/callgemini')) {
+      const body = (init && init.body) ? JSON.parse(init.body) : {};
+      init = ensureInit(init);
+      init.method = 'POST';
+      init.headers = ensureHeaders(init.headers);
+      init.body = JSON.stringify(Object.assign({ task: 'default' }, body));
+      url = '/.netlify/functions/ai-handler';
+    }
+    return _fetch.call(this, url, init);
+  };
+})();
+</script>
+
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center py-8">
+            <h1 class="font-display text-4xl md:text-6xl font-black">AI BRADAA</h1>
+            <p class="text-lg text-[var(--c-text-secondary)] mt-2">Powered by Kaa-Ching!</p>
+        </header>
+
+        <nav class="nav-sticky py-3 mb-12">
+            <div class="flex flex-wrap justify-center gap-4 md:gap-6 text-sm">
+                <a href="#matchmaker" class="nav-button active px-1 py-2 font-semibold">Matchmaker</a>
+                <a href="#comparison" class="nav-button px-1 py-2 font-semibold">Versus</a>
+                <a href="#explorer" class="nav-button px-1 py-2 font-semibold">Explorer</a>
+                <a href="#toolkit" class="nav-button px-1 py-2 font-semibold">Ops Command</a>
+                <a href="#intelligence" class="nav-button px-1 py-2 font-semibold">Intel</a>
+                <a href="#appendices" class="nav-button px-1 py-2 font-semibold">Appendices</a>
+                <a href="#camera-tech" class="nav-button px-1 py-2 font-semibold">Camera Tech</a>
+            </div>
+        </nav>
+
+        <main class="space-y-16">
+            <section id="matchmaker" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">AI Laptop Matchmaker</h2>
+                    <div class="grid md:grid-cols-2 gap-8 items-center">
+                        <div class="space-y-4">
+                            <p class="text-[var(--c-text-secondary)]">Answer the prompts. Receive your personalized, monetized recommendation instantly.</p>
+                            <div><label class="block mb-2">1. Your Budget (MYR)</label><select id="match-budget" class="w-full"><option>Under RM4,500</option><option selected>RM4,500 - RM7,000</option><option>No Budget (Concierge)</option></select></div>
+                            <div><label class="block mb-2">2. Primary Use Case</label><select id="match-usecase" class="w-full"><option>AI/ML & Coding</option><option>Creative Work (Video/3D)</option><option>Gaming & General Use</option></select></div>
+                            <div><label class="block mb-2">3. Portability Need</label><select id="match-portability" class="w-full"><option>Desk Setup (Max Power)</option><option>Frequent Traveler (Light & Efficient)</option><option>Balanced Hybrid</option></select></div>
+                            <button id="find-match-btn" class="w-full action-button">Find My Match</button>
+                        </div>
+                        <div id="matchmaker-output" class="p-4 bg-[var(--c-bg)] rounded-lg min-h-[250px] text-[var(--c-text-secondary)] gemini-output">Your AI recommendation will appear here...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="comparison" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">Head-to-Head Comparison</h2>
+                    <p class="text-sm text-[var(--c-text-secondary)] mb-4">Select 2-3 units for a tactical breakdown. The AI will generate an automated strategic analysis.</p>
+                    <div class="max-h-48 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2 mb-6 p-2 bg-[var(--c-bg)] rounded-lg" id="laptop-selector-container">Loading Intel...</div>
+                    <div class="grid md:grid-cols-2 gap-8 items-center">
+                         <div style="position: relative; height:450px;"><canvas id="radarChart"></canvas></div>
+                         <div id="gemini-comparison-output" class="p-4 bg-[var(--c-bg)] rounded-lg min-h-[300px] text-sm text-[var(--c-text-secondary)] gemini-output">Awaiting target selection for AI analysis...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="explorer" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">Interactive Laptop Explorer</h2>
+                    <div id="filters" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 bg-[var(--c-bg)] rounded-lg">
+                        <div><label class="font-semibold text-sm mb-2 block">Price Range (≤ RM<span id="price-value">7000</span>)</label><input type="range" id="price-filter" min="3500" max="7000" value="7000" step="100" class="w-full"></div>
+                        <div><label class="font-semibold text-sm mb-2 block">Platform</label><div class="flex gap-2"><button class="filter-button platform-filter flex-1 border border-[var(--c-border)] px-3 py-2 text-sm rounded-md active" data-platform="All">All</button><button class="filter-button platform-filter flex-1 border border-[var(--c-border)] px-3 py-2 text-sm rounded-md" data-platform="CUDA">CUDA</button><button class="filter-button platform-filter flex-1 border border-[var(--c-border)] px-3 py-2 text-sm rounded-md" data-platform="NPU">NPU</button><button class="filter-button platform-filter flex-1 border border-[var(--c-border)] px-3 py-2 text-sm rounded-md" data-platform="Mac">Mac</button></div></div>
+                        <div><label class="font-semibold text-sm mb-2 block">Brand</label><select id="brand-filter" class="w-full"><option value="All" selected>All Brands</option></select></div>
+                        <div><label class="font-semibold text-sm mb-2 block">Sort By</label><select id="sort-filter" class="w-full"><option value="score_desc" selected>Score (High-Low)</option><option value="price_asc">Price (Low-High)</option><option value="price_desc">Price (High-Low)</option><option value="value_desc">Value Rating (Score-to-Price Ratio)</option></select></div>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-8 mb-8">
+                        <div style="position: relative; height:500px;"><canvas id="rankingsChart"></canvas></div>
+                        <div style="position: relative; height:500px;"><canvas id="valueChart"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="toolkit" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">Strategic Operations Command</h2>
+                    <div class="grid md:grid-cols-3 gap-8">
+                        <div class="md:col-span-1 space-y-2 max-h-[500px] overflow-y-auto">
+                            <button class="tool-selector-btn active" data-tool="deal-assassin">Deal Assassin</button>
+                            <button class="tool-selector-btn" data-tool="upgrade-strategist">Upgrade Strategist</button>
+                            <button class="tool-selector-btn" data-tool="dream-rig-architect">Dream Rig Architect</button>
+                            <button class="tool-selector-btn" data-tool="elite-procurement">Elite Procurement</button>
+                            <button class="tool-selector-btn" data-tool="component-recon">Component Recon</button>
+                            <button class="tool-selector-btn" data-tool="performance-forecaster">Performance Forecaster</button>
+                            <button class="tool-selector-btn" data-tool="system-integrity">System Integrity Analysis</button>
+                            <button class="tool-selector-btn" data-tool="ecosystem-architect">Ecosystem Architect</button>
+                            <button class="tool-selector-btn" data-tool="longevity-analyst">Longevity Analyst</button>
+                            <button class="tool-selector-btn" data-tool="asset-value">Asset Value Forecaster</button>
+                            <button class="tool-selector-btn" data-tool="field-support">Field Support</button>
+                        </div>
+                        <div id="toolkit-console" class="md:col-span-2 bg-[var(--c-bg)] p-4 rounded-lg flex flex-col">
+                           </div>
+                    </div>
+                </div>
+            </section>
+
+             <section id="intelligence" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">"Live" Forward Intelligence</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="p-4 bg-[var(--c-bg)] rounded-lg">
+                            <h3 id="intel-0-title" class="font-display text-lg text-[var(--c-accent-pink)]">Acquiring Intel...</h3>
+                            <p id="intel-0-summary" class="text-xs text-[var(--c-text-secondary)] mt-2">Connecting to live feed...</p>
+                            <p class="mt-3 font-semibold">Verdict: <span id="intel-0-verdict" class="text-[var(--c-accent-pink)]">STANDBY</span> <span id="intel-0-window" class="text-xs font-normal text-gray-400 ml-2"></span></p>
+                        </div>
+                        <div class="p-4 bg-[var(--c-bg)] rounded-lg">
+                            <h3 id="intel-1-title" class="font-display text-lg text-[var(--c-accent-cyan)]">Acquiring Intel...</h3>
+                            <p id="intel-1-summary" class="text-xs text-[var(--c-text-secondary)] mt-2">Connecting to live feed...</p>
+                            <p class="mt-3 font-semibold">Verdict: <span id="intel-1-verdict" class="text-[var(--c-accent-cyan)]">STANDBY</span> <span id="intel-1-window" class="text-xs font-normal text-gray-400 ml-2"></span></p>
+                        </div>
+                        <div class="p-4 bg-[var(--c-bg)] rounded-lg">
+                            <h3 id="intel-2-title" class="font-display text-lg text-[var(--c-text-secondary)]">Acquiring Intel...</h3>
+                            <p id="intel-2-summary" class="text-xs text-[var(--c-text-secondary)] mt-2">Connecting to live feed...</p>
+                            <p class="mt-3 font-semibold">Verdict: <span id="intel-2-verdict" class="text-[var(--c-text-secondary)]">STANDBY</span> <span id="intel-2-window" class="text-xs font-normal text-gray-400 ml-2"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="appendices" class="card">
+                <div class="card-content">
+                    <h2 class="font-display text-2xl mb-4 text-[var(--c-accent-cyan)]">Appendices & Data</h2>
+                    <div>
+                        <h3 class="font-display text-xl mb-4 text-center">Full Ranked Database (Live Filtered)</h3>
+                        <div class="overflow-x-auto max-h-[500px]"><table class="w-full text-sm text-left"><thead class="sticky top-0 bg-[var(--c-bg)]"><tr><th class="px-4 py-3">#</th><th class="px-4 py-3">Model</th><th class="px-4 py-3">Platform</th><th class="px-4 py-3">Price</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Top Feature</th></tr></thead><tbody id="fullRankingsTableBody"><tr><td colspan="6" class="text-center p-8">Awaiting market intel...</td></tr></tbody></table></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="camera-tech" class="card">
+                <div class="card-content flex flex-col justify-center items-center text-center min-h-[250px]">
+                    <h2 class="font-display text-2xl text-[var(--c-text-secondary)]">Camera Tech Division</h2>
+                    <p class="mt-4 text-[var(--c-text-secondary)]">A new strategic vertical is under development.</p>
+                    <p class="font-display text-4xl mt-4 animate-pulse">COMING SOON</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+<script>
+/* ==========================================================================
+   AI Bradaa Strategic Command — Frontend Shell (Refactor v10.1.R1)
+   Mission: Zero UI/UX change. 100% internal hardening.
+   Guardrails: PDPA-aware, Halal-safe examples, Malaysia-first.
+   ========================================================================== */
+(() => {
+  'use strict';
+
+  // --- STATE ----------------------------------------------------------------
+  /** Single source of truth for ALL dynamic data & instances. */
+  const S = {
+    data: {
+      allLaptops: [],          // raw or API-provided
+      sortedByRank: [],        // derived
+      fallbackLaptops: [
+        { brand: 'Illegear', model: 'Onyx G', price: 6899, score: 95, platform: 'CUDA', why: 'Peak RTX 4060 performance and cooling', scores: { ai: 9.8, thermals: 9, upgrade: 9, linux: 7, portability: 6, value: 9.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Apple', model: 'MacBook Pro 14" M3 Pro', price: 6999, score: 93, platform: 'Mac', why: 'Most powerful Mac in budget', scores: { ai: 8.8, thermals: 8, upgrade: 1, linux: 1, portability: 8.5, value: 8 }, upgradability: { ram: 'soldered', ssd: 'soldered' } },
+        { brand: 'Illegear', model: 'Z7', price: 5699, score: 92, platform: 'CUDA', why: 'Top-tier performance & upgradability', scores: { ai: 9.5, thermals: 8.5, upgrade: 9, linux: 7, portability: 6, value: 9 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Lenovo', model: 'Yoga Slim 7x', price: 5999, score: 89, platform: 'NPU', why: 'Elite efficiency & NPU power', scores: { ai: 8, thermals: 7, upgrade: 2, linux: 6, portability: 9.5, value: 8 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'ASUS', model: 'Zenbook 14 OLED', price: 5999, score: 87, platform: 'NPU', why: 'Premium build, stunning display', scores: { ai: 7.8, thermals: 7.5, upgrade: 2, linux: 7, portability: 9.8, value: 7.5 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Apple', model: 'MacBook Air 15" M3 (16GB)', price: 6899, score: 86, platform: 'Mac', why: 'Large screen & 16GB RAM for AI', scores: { ai: 7.8, thermals: 7, upgrade: 1, linux: 1, portability: 9.5, value: 7 }, upgradability: { ram: 'soldered', ssd: 'soldered' } },
+        { brand: 'Lenovo', model: 'Yoga Slim 7i (Intel)', price: 5799, score: 85, platform: 'NPU', why: 'Strong Intel NPU with great build', scores: { ai: 7.7, thermals: 7.5, upgrade: 3, linux: 8, portability: 9, value: 8 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Lenovo', model: 'LOQ 15IRH9', price: 4599, score: 84, platform: 'CUDA', why: 'Best value for RTX 40-series', scores: { ai: 8, thermals: 8, upgrade: 8, linux: 8, portability: 6.5, value: 9.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Honor', model: 'MagicBook Pro 16', price: 5499, score: 83, platform: 'NPU', why: 'Powerful AMD NPU and great display', scores: { ai: 7.5, thermals: 8, upgrade: 4, linux: 7.5, portability: 8, value: 8 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Aftershock', model: 'Apex 15X Lite', price: 4900, score: 82, platform: 'CUDA', why: 'Excellent customizability', scores: { ai: 8.2, thermals: 8.5, upgrade: 9, linux: 7, portability: 6, value: 8.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'HP', model: 'Victus 16 (AMD)', price: 4999, score: 82, platform: 'CUDA', why: 'Large screen and solid combo', scores: { ai: 8, thermals: 8.2, upgrade: 8, linux: 7.5, portability: 5, value: 8.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Gigabyte', model: 'G5 MF', price: 4699, score: 81, platform: 'CUDA', why: 'Strong all-around budget CUDA', scores: { ai: 8, thermals: 7.8, upgrade: 8, linux: 7, portability: 6, value: 9 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'ASUS', model: 'TUF Gaming A15', price: 4799, score: 80, platform: 'CUDA', why: 'Durable with solid CPU', scores: { ai: 7.8, thermals: 8, upgrade: 8, linux: 8, portability: 5.5, value: 8.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'MSI', model: 'Thin GF63', price: 4799, score: 79, platform: 'CUDA', why: 'Lightweight for a gaming laptop', scores: { ai: 7.9, thermals: 7.2, upgrade: 7, linux: 7, portability: 7, value: 8 }, upgradability: { ram: '2 slots', ssd: '1 slot' } },
+        { brand: 'Dell', model: 'G15 5530', price: 4899, score: 78, platform: 'CUDA', why: 'Powerful CPU & great warranty', scores: { ai: 8, thermals: 7.5, upgrade: 7, linux: 7.5, portability: 5, value: 8 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Infinix', model: 'GT Book', price: 4499, score: 77, platform: 'CUDA', why: 'Aggressive pricing for RTX 4050', scores: { ai: 7.8, thermals: 7, upgrade: 7, linux: 6.5, portability: 6.5, value: 9.2 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Acer', model: 'Nitro V 15', price: 4299, score: 76, platform: 'CUDA', why: 'Most affordable RTX 4050', scores: { ai: 7.5, thermals: 7, upgrade: 8, linux: 7, portability: 6, value: 9 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Illegear', model: 'Arté 14', price: 5499, score: 76, platform: 'NPU', why: 'Boutique ultrabook with customisation', scores: { ai: 7.0, thermals: 7, upgrade: 4, linux: 8, portability: 9.2, value: 7 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Acer', model: 'Swift X 14', price: 5599, score: 75, platform: 'CUDA', why: 'Portable creator laptop with dGPU', scores: { ai: 6.5, thermals: 7, upgrade: 2, linux: 7, portability: 9, value: 6.5 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Samsung', model: 'Galaxy Book4', price: 5299, score: 74, platform: 'NPU', why: 'Ultra-premium build and AMOLED', scores: { ai: 6, thermals: 7, upgrade: 3, linux: 7, portability: 9.5, value: 6 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'HUAWEI', model: 'MateBook 14', price: 5399, score: 73, platform: 'NPU', why: 'Excellent display and ecosystem', scores: { ai: 6.2, thermals: 7.2, upgrade: 3, linux: 6, portability: 9.3, value: 6.5 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'ASUS', model: 'Vivobook Pro 15 OLED', price: 4999, score: 72, platform: 'CUDA', why: 'Best-in-class display', scores: { ai: 6, thermals: 6.5, upgrade: 5, linux: 6, portability: 8, value: 7 }, upgradability: { ram: '1 slot', ssd: '1 slot' } },
+        { brand: 'Aftershock', model: 'Forge 15S', price: 3899, score: 71, platform: 'CUDA', why: 'Best value for entry-level CUDA', scores: { ai: 5.8, thermals: 7.5, upgrade: 9, linux: 7, portability: 6, value: 8.8 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Razer', model: 'Blade 14 (older spec)', price: 6599, score: 70, platform: 'CUDA', why: 'Premium build, on clearance', scores: { ai: 7.5, thermals: 8.5, upgrade: 2, linux: 6, portability: 8, value: 5 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'HP', model: 'Victus 15', price: 3999, score: 69, platform: 'CUDA', why: 'Strong entry-level dGPU', scores: { ai: 5.5, thermals: 7, upgrade: 7, linux: 7.5, portability: 7, value: 8 }, upgradability: { ram: '2 slots', ssd: '1 slot' } },
+        { brand: 'Microsoft', model: 'Surface Laptop 5 (15")', price: 5899, score: 68, platform: 'NPU', why: 'Excellent keyboard and premium feel', scores: { ai: 5, thermals: 6, upgrade: 1, linux: 8, portability: 9, value: 5.5 }, upgradability: { ram: 'soldered', ssd: 'soldered' } },
+        { brand: 'Dell', model: 'Inspiron 14 Plus', price: 5199, score: 67, platform: 'NPU', why: 'Solid workhorse with a good screen', scores: { ai: 5.8, thermals: 6.5, upgrade: 4, linux: 8.5, portability: 8.5, value: 6 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'MSI', model: 'Cyborg 15', price: 4599, score: 66, platform: 'CUDA', why: 'Unique transparent chassis', scores: { ai: 7.7, thermals: 6.5, upgrade: 7, linux: 7, portability: 7.2, value: 7 }, upgradability: { ram: '2 slots', ssd: '1 slot' } },
+        { brand: 'Lenovo', model: 'IdeaPad Slim 5 OLED', price: 4899, score: 65, platform: 'NPU', why: 'Affordable OLED with AMD Ryzen AI', scores: { ai: 6.5, thermals: 7, upgrade: 3, linux: 8, portability: 9, value: 7.5 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Gigabyte', model: 'AORUS 15 (entry)', price: 5999, score: 64, platform: 'CUDA', why: 'High-end brand features', scores: { ai: 8.5, thermals: 9, upgrade: 8, linux: 7, portability: 5, value: 6 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Acer', model: 'Aspire 7 Gaming', price: 3799, score: 63, platform: 'CUDA', why: 'Cheapest entry to CUDA', scores: { ai: 5.2, thermals: 6.8, upgrade: 8, linux: 7, portability: 6.5, value: 8.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Level51', model: 'Terra 15S', price: 4350, score: 62, platform: 'CUDA', why: 'Local custom builder', scores: { ai: 7.5, thermals: 7.2, upgrade: 9, linux: 7, portability: 6, value: 7.5 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Honor', model: 'MagicBook X 16 Pro', price: 4199, score: 61, platform: 'NPU', why: 'Large lightweight screen', scores: { ai: 5.5, thermals: 7, upgrade: 2, linux: 7, portability: 8.5, value: 7 }, upgradability: { ram: 'soldered', ssd: '1 slot' } },
+        { brand: 'Xiaomi', model: 'Redmi G Pro', price: 5899, score: 60, platform: 'CUDA', why: 'High specs, check warranty', scores: { ai: 8.8, thermals: 8.5, upgrade: 8, linux: 5, portability: 5, value: 7 }, upgradability: { ram: '2 slots', ssd: '2 slots' } },
+        { brand: 'Jumper', model: 'TechBook 16', price: 3599, score: 55, platform: 'NPU', why: 'Ultra-budget NPU entry', scores: { ai: 4, thermals: 5, upgrade: 2, linux: 6, portability: 9, value: 8 }, upgradability: { ram: 'soldered', ssd: '1 slot' } }
+      ]
+    },
+    ui: {
+      app: { price: 7000, platform: 'All', brand: 'All', sort: 'score_desc', radarSelection: [] }
+    },
+    charts: { rankings: null, radar: null, value: null },
+    config: {
+      chartFont: { family: "'Share Tech Mono', monospace", size: 12 },
+      platformColors: { CUDA: 'text-[#00F0FF]', NPU: 'text-[#D83F87]', Mac: 'text-gray-400' },
+      platformColorMap: { CUDA: 'rgba(0, 240, 255, 0.7)', NPU: 'rgba(216, 63, 135, 0.7)', Mac: 'rgba(168, 178, 204, 0.7)' }
+    }
+  };
+
+  // --- CONSTANTS & CONFIG ---------------------------------------------------
+  /** Idempotent Chart.js defaults so we keep identical visuals. */
+  function configureCharts() {
+    if (window.Chart) {
+      Chart.defaults.color = '#A8B2CC';
+      Chart.defaults.font = S.config.chartFont;
+      Chart.defaults.borderColor = 'rgba(48, 54, 61, 0.8)';
+    }
+  }
+
+  // --- PURE SELECTORS / COMPUTATIONS ---------------------------------------
+  function computeFilteredSet() {
+    const { allLaptops } = S.data;
+    const { price, platform, brand, sort } = S.ui.app;
+    if (!allLaptops || allLaptops.length === 0) return [];
+
+    let data = S.data.sortedByRank.filter(d =>
+      d.price <= price &&
+      (platform === 'All' || d.platform === platform) &&
+      (brand === 'All' || d.brand === brand)
+    );
+
+    const sorter = {
+      price_asc: (a, b) => a.price - b.price,
+      price_desc: (a, b) => b.price - a.price,
+      score_desc: (a, b) => b.score - a.score,
+      value_desc: (a, b) => b.value_rating - a.value_rating
+    };
+
+    data.sort(sorter[sort] || sorter.score_desc);
+    return data;
+  }
+
+  // --- RENDER FUNCTIONS -----------------------------------------------------
+  function renderFilteredData() {
+    const data = computeFilteredSet();
+    renderTable(data);
+    renderCharts(data);
+  }
+
+  function renderTable(data) {
+    const tableBody = document.getElementById('fullRankingsTableBody');
+    if (!tableBody) return;
+    if (data.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center p-8">No matching units for current filter.</td></tr>';
+      return;
+    }
+    const { platformColors } = S.config;
+    const { sort } = S.ui.app;
+    tableBody.innerHTML = data.map((d, i) => `
+      <tr class="border-b border-[var(--c-border)]">
+        <td class="px-4 py-3">${sort === 'score_desc' ? d.rank : i + 1}</td>
+        <td class="px-4 py-3 font-semibold">${d.model}</td>
+        <td class="px-4 py-3 font-semibold ${platformColors[d.platform] || ''}">${d.platform}</td>
+        <td class="px-4 py-3">RM ${d.price}</td>
+        <td class="px-4 py-3 font-bold">${d.score}</td>
+        <td class="px-4 py-3 text-xs text-[var(--c-text-secondary)]">${d.why}</td>
+      </tr>`).join('');
+  }
+
+  function renderCharts(data) {
+    const top15 = data.slice(0, 15);
+    const rankingsData = {
+      labels: top15.map(d => d.model),
+      datasets: [{ data: top15.map(d => d.score), backgroundColor: 'rgba(0, 240, 255, 0.7)' }]
+    };
+
+    if (!S.charts.rankings) {
+      S.charts.rankings = new Chart('rankingsChart', {
+        type: 'bar',
+        data: rankingsData,
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, max: 100 } }
+        }
+      });
+    } else {
+      S.charts.rankings.data = rankingsData;
+      S.charts.rankings.update();
+    }
+
+    const valueData = {
+      datasets: [{
+        data: data.map(d => ({ x: d.price, y: d.score, model: d.model })),
+        backgroundColor: data.map(d => S.config.platformColorMap[d.platform]),
+        pointRadius: 6, pointHoverRadius: 10
+      }]
+    };
+
+    if (!S.charts.value) {
+      S.charts.value = new Chart('valueChart', {
+        type: 'scatter', data: valueData, options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.raw.model}: RM${c.raw.x}, Score: ${c.raw.y}` } } },
+          scales: { x: { title: { display: true, text: 'Price (RM)' } }, y: { title: { display: true, text: 'Score' } } }
+        }
+      });
+    } else {
+      S.charts.value.data = valueData;
+      S.charts.value.update();
+    }
+  }
+
+  function renderRadarChart() {
+    if (!S.data.allLaptops.length) return;
+    const selected = S.data.allLaptops.filter(l => S.ui.app.radarSelection.includes(l.model));
+    const colors = ['#D83F87', '#00F0FF', '#F8F32B'];
+
+    const datasets = selected.map((laptop, i) => {
+      const hex = colors[i];
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return {
+        label: laptop.model,
+        data: Object.values(laptop.scores),
+        fill: true,
+        backgroundColor: `rgba(${r},${g},${b},0.2)`,
+        borderColor: hex,
+        pointBackgroundColor: hex
+      };
+    });
+
+    const radarData = {
+      labels: ['AI Perf.', 'Thermals', 'Upgrade', 'Linux', 'Portability', 'Value'],
+      datasets
+    };
+
+    if (!S.charts.radar) {
+      S.charts.radar = new Chart('radarChart', {
+        type: 'radar',
+        data: radarData,
+        options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 10, pointLabels: { font: S.config.chartFont }, ticks: { display: false } } } }
+      });
+    } else {
+      S.charts.radar.data = radarData;
+      S.charts.radar.update();
+    }
+
+    const out = document.getElementById('gemini-comparison-output');
+    if (selected.length >= 2) {
+      const systemPrompt = "You are a laptop expert. Analyze the trade-offs between the selected laptops based on their scores. Explain which laptop is better for different types of users in a concise, comparative summary. Use the provided data to justify your analysis. Format with markdown.";
+      callGeminiAPI(systemPrompt, `Analyze these laptops:\n${JSON.stringify(selected, null, 2)}`, out);
+    } else if (out) {
+      out.textContent = 'Awaiting target selection for AI analysis...';
+    }
+  }
+
+  // --- TOOLKIT CONSOLE ------------------------------------------------------
+  function renderToolkitConsole(toolId) {
+    const consoleEl = document.getElementById('toolkit-console');
+    if (!consoleEl) return;
+
+    const laptopOptions = S.data.allLaptops
+      .map(l => `<option value="${l.model.replace(/"/g, '&quot;')}">${l.model}</option>`)
+      .join('');
+
+    const toolUIs = {
+      'deal-assassin': `<label class="mb-2">Product Name:</label><input type="text" id="tool-input-query" placeholder="e.g., Illegear Onyx G RTX 4060" class="w-full mb-4"><button data-tool-action="deal-assassin" class="action-button mt-auto">Find Best Deal</button>`,
+      'upgrade-strategist': `<label class="mb-2">Select Base Laptop:</label><select id="tool-input-laptop" class="w-full mb-4">${laptopOptions}</select><label class="mb-2">Define Goal:</label><select id="tool-input-goal" class="w-full mb-4"><option>Run 13B models smoothly</option><option>Maximize data storage</option></select><button data-tool-action="upgrade-strategist" class="action-button mt-auto">Get AI Upgrade Plan</button>`,
+      'dream-rig-architect': `<label class="mb-2">Budget (MYR):</label><input type="number" id="tool-input-budget" placeholder="e.g., 8000" class="w-full mb-4"><label class="mb-2">Primary Use:</label><select id="tool-input-use" class="w-full mb-4"><option>AI & CUDA Development</option><option>4K Gaming & Streaming</option></select><button data-tool-action="dream-rig-architect" class="action-button mt-auto">Architect My Rig</button>`,
+      'elite-procurement': `<label class="mb-2">Rare Component/Laptop:</label><input type="text" id="tool-input-item" placeholder="e.g., Razer Blade 16 Mini-LED" class="w-full mb-4"><button data-tool-action="elite-procurement" class="action-button mt-auto">Initiate Procurement Scan</button>`,
+      'component-recon': `<label class="mb-2">Component Model:</label><input type="text" id="tool-input-component" placeholder="e.g., Core Ultra 9 185H" class="w-full mb-4"><button data-tool-action="component-recon" class="action-button mt-auto">Run Reconnaissance</button>`,
+      'performance-forecaster': `<label class="mb-2">Select Laptop:</label><select id="tool-input-laptop" class="w-full mb-4">${laptopOptions}</select><label class="mb-2">Target Application:</label><input type="text" id="tool-input-app" placeholder="e.g., Stable Diffusion XL" class="w-full mb-4"><button data-tool-action="performance-forecaster" class="action-button mt-auto">Forecast Performance</button>`,
+      'system-integrity': `<label class="mb-2">System Issue Description:</label><textarea id="tool-input-issue" placeholder="Describe the problem, e.g., 'BSOD when running PyTorch scripts'" class="w-full mb-4 h-24"></textarea><button data-tool-action="system-integrity" class="action-button mt-auto">Analyze Integrity</button>`,
+      'ecosystem-architect': `<label class="mb-2">Current Devices:</label><input type="text" id="tool-input-devices" placeholder="e.g., iPhone 15 Pro, iPad Air" class="w-full mb-4"><button data-tool-action="ecosystem-architect" class="action-button mt-auto">Find Best Laptop Fit</button>`,
+      'longevity-analyst': `<label class="mb-2">Select Laptop for Analysis:</label><select id="tool-input-laptop" class="w-full mb-4">${laptopOptions}</select><button data-tool-action="longevity-analyst" class="action-button mt-auto">Analyze Longevity</button>`,
+      'asset-value': `<label class="mb-2">Select Laptop:</label><select id="tool-input-laptop" class="w-full mb-4">${laptopOptions}</select><label class="mb-2">Condition:</label><select id="tool-input-condition" class="w-full mb-4"><option>Like New</option><option>Good</option><option>Fair</option></select><button data-tool-action="asset-value" class="action-button mt-auto">Forecast Resale Value</button>`,
+      'field-support': `<label class="mb-2">Technical Query:</label><textarea id="tool-input-query" placeholder="e.g., How to dual-boot Ubuntu on Illegear Onyx G?" class="w-full mb-4 h-24"></textarea><button data-tool-action="field-support" class="action-button mt-auto">Request Field Support</button>`,
+      'default': `<p class="text-lg text-[var(--c-text-secondary)]">Select a tool to begin operation.</p>`
+    };
+
+    consoleEl.innerHTML = '';
+    const toolUI = document.createElement('div');
+    toolUI.className = 'flex-grow flex flex-col';
+    toolUI.innerHTML = toolUIs[toolId] || toolUIs['default'];
+
+    const outputUI = document.createElement('div');
+    outputUI.id = 'toolkit-output';
+    outputUI.className = 'mt-4 p-4 bg-black/50 rounded-lg min-h-[150px] text-sm text-[var(--c-text-secondary)] gemini-output';
+    outputUI.textContent = 'Output will appear here...';
+
+    consoleEl.appendChild(toolUI);
+    consoleEl.appendChild(outputUI);
+
+    // restart animation
+    consoleEl.classList.remove('console-animating');
+    void consoleEl.offsetWidth;
+    consoleEl.classList.add('console-animating');
+  }
+
+  // --- EVENT HANDLERS -------------------------------------------------------
+  function setupEventListeners() {
+    const price = document.getElementById('price-filter');
+    const priceVal = document.getElementById('price-value');
+    if (price && priceVal) {
+      price.addEventListener('input', e => {
+        S.ui.app.price = Number(e.target.value);
+        priceVal.textContent = e.target.value;
+        renderFilteredData();
+      });
+    }
+
+    document.querySelectorAll('.platform-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prev = document.querySelector('.platform-filter.active');
+        if (prev) prev.classList.remove('active');
+        btn.classList.add('active');
+        S.ui.app.platform = btn.dataset.platform;
+        renderFilteredData();
+      });
+    });
+
+    const sort = document.getElementById('sort-filter');
+    if (sort) sort.addEventListener('change', e => { S.ui.app.sort = e.target.value; renderFilteredData(); });
+
+    const brand = document.getElementById('brand-filter');
+    if (brand) brand.addEventListener('change', e => { S.ui.app.brand = e.target.value; renderFilteredData(); });
+
+    const selectorContainer = document.getElementById('laptop-selector-container');
+    if (selectorContainer) {
+      selectorContainer.addEventListener('click', e => {
+        if (e.target.classList.contains('radar-selector')) {
+          const btn = e.target;
+          const model = btn.dataset.model;
+          const idx = S.ui.app.radarSelection.indexOf(model);
+          if (idx > -1) { S.ui.app.radarSelection.splice(idx, 1); btn.classList.remove('active'); }
+          else if (S.ui.app.radarSelection.length < 3) { S.ui.app.radarSelection.push(model); btn.classList.add('active'); }
+          renderRadarChart();
+        }
+      });
+    }
+
+    const toolkitSelectors = document.querySelectorAll('.tool-selector-btn');
+    toolkitSelectors.forEach(btn => btn.addEventListener('click', () => {
+      toolkitSelectors.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderToolkitConsole(btn.dataset.tool);
+    }));
+
+    const toolkitConsole = document.getElementById('toolkit-console');
+    if (toolkitConsole) {
+      toolkitConsole.addEventListener('click', e => {
+        if (!e.target.matches('[data-tool-action]')) return;
+        const action = e.target.dataset.toolAction;
+        const outputEl = document.getElementById('toolkit-output');
+        let systemPrompt, userPrompt;
+
+        try {
+          switch (action) {
+            case 'deal-assassin':
+              systemPrompt = 'You are a deal hunter AI. Find the best current deals for the given product in Malaysia from official stores, Lazada, and Shopee. Provide direct links and prices.';
+              userPrompt = `Product: ${document.getElementById('tool-input-query').value}`;
+              break;
+            case 'upgrade-strategist':
+              systemPrompt = 'You are a PC upgrade expert. Based on the laptop and goal, suggest specific RAM and SSD upgrades (e.g., \"Crucial 32GB DDR5 5600MHz kit\", \"Samsung 990 Pro 2TB NVMe SSD\"), including estimated costs in MYR.';
+              userPrompt = `Laptop: ${document.getElementById('tool-input-laptop').value}, Goal: ${document.getElementById('tool-input-goal').value}`;
+              break;
+            case 'dream-rig-architect':
+              systemPrompt = 'You are a PC build architect. Create a complete parts list for a desktop PC build in Malaysia, respecting the budget. List each component (CPU, GPU, RAM, etc.) with its model and estimated MYR price.';
+              userPrompt = `Budget: RM${document.getElementById('tool-input-budget').value}, Primary Use: ${document.getElementById('tool-input-use').value}`;
+              break;
+            case 'elite-procurement':
+              systemPrompt = 'You are a procurement specialist for rare tech. Find where the specified item can be purchased and shipped to Malaysia, even if from international sellers. Detail the store, price, and any import considerations.';
+              userPrompt = `Item to procure: ${document.getElementById('tool-input-item').value}`;
+              break;
+            case 'component-recon':
+              systemPrompt = 'You are a hardware analyst. Provide a deep-dive technical analysis of the specified component, focusing on its architecture, performance benchmarks, and suitability for AI/ML tasks.';
+              userPrompt = `Component for reconnaissance: ${document.getElementById('tool-input-component').value}`;
+              break;
+            case 'performance-forecaster':
+              systemPrompt = 'You are a performance analyst AI. Based on the laptop\'s known specs, forecast its performance for the specified application. Give a qualitative summary (e.g., \"Fast, ~10 mins per task\") and any quantitative estimates (e.g., \"tokens/sec\", \"iterations/sec\").';
+              const laptopModel = document.getElementById('tool-input-laptop').value;
+              const laptopData = JSON.stringify(S.data.allLaptops.find(l => l.model === laptopModel));
+              userPrompt = `Forecast performance for this laptop: ${laptopData}\nOn this application: ${document.getElementById('tool-input-app').value}`;
+              break;
+            case 'system-integrity':
+              systemPrompt = 'You are a system diagnostics AI. Analyze the user\'s problem description and suggest a list of prioritized troubleshooting steps to resolve the issue.';
+              userPrompt = `System issue: ${document.getElementById('tool-input-issue').value}`;
+              break;
+            case 'ecosystem-architect':
+              systemPrompt = 'You are an ecosystem integration expert. Recommend the best laptop that integrates seamlessly with the user\'s existing devices, explaining the key integration features (e.g., Handoff, Phone Link).';
+              userPrompt = `Existing devices: ${document.getElementById('tool-input-devices').value}`;
+              break;
+            case 'longevity-analyst':
+              systemPrompt = 'You are a tech futurist. Analyze the selected laptop\'s specifications (CPU, GPU, RAM upgradability) and forecast its useful lifespan for serious AI development work. Consider upcoming software and model changes. Provide a verdict in years.';
+              const longevityLaptop = document.getElementById('tool-input-laptop').value;
+              const longevityLaptopData = JSON.stringify(S.data.allLaptops.find(l => l.model === longevityLaptop));
+              userPrompt = `Analyze this laptop for longevity: ${longevityLaptopData}`;
+              break;
+            case 'asset-value':
+              systemPrompt = 'You are a market value analyst for used electronics. Forecast the resale value of the specified laptop in Malaysia in 1 year, 2 years, and 3 years, given its condition. Present the forecast in MYR.';
+              userPrompt = `Laptop: ${document.getElementById('tool-input-laptop').value}, Condition: ${document.getElementById('tool-input-condition').value}`;
+              break;
+            case 'field-support':
+              systemPrompt = 'You are an expert IT support technician. Provide clear, step-by-step instructions to solve the user\'s technical query.';
+              userPrompt = `Support Query: ${document.getElementById('tool-input-query').value}`;
+              break;
+            default:
+              if (outputEl) outputEl.textContent = 'Error: Tool action not recognized.';
+              return;
+          }
+          if (!userPrompt.split(':')[1] || !userPrompt.split(':')[1].trim()) {
+            if (outputEl) outputEl.textContent = 'Error: Input required for analysis.';
+            return;
+          }
+          callGeminiAPI(systemPrompt, userPrompt, outputEl);
+        } catch (err) {
+          if (outputEl) outputEl.textContent = 'Error: Could not process tool request. Ensure an item is selected or text is entered.';
+        }
+      });
+    }
+
+    const matchBtn = document.getElementById('find-match-btn');
+    if (matchBtn) {
+      matchBtn.addEventListener('click', () => {
+        const systemPrompt = 'You are the AI Matchmaker. Based on user criteria, select the single best laptop from the provided list. Justify your choice with a detailed, monetized recommendation. Explain why it\'s the perfect fit and why others were not chosen. Format with markdown.';
+        const budget = document.getElementById('match-budget').value;
+        const usecase = document.getElementById('match-usecase').value;
+        const portability = document.getElementById('match-portability').value;
+        const userPrompt = `My criteria:\nBudget: ${budget}\nUsecase: ${usecase}\nPortability: ${portability}\n\nAvailable Laptops:\n${JSON.stringify(S.data.allLaptops, null, 2)}`;
+        const out = document.getElementById('matchmaker-output');
+        callGeminiAPI(systemPrompt, userPrompt, out);
+      });
+    }
+
+    // sticky nav active state sync
+    const navLinks = document.querySelectorAll('.nav-button');
+    const sections = document.querySelectorAll('main section');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          navLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${id}`));
+        }
+      });
+    }, { rootMargin: '-40% 0px -60% 0px' });
+    sections.forEach(section => observer.observe(section));
+  }
+
+  // --- API CALLS ------------------------------------------------------------
+  async function callGeminiAPI(systemPrompt, userPrompt, outputElement) {
+    if (outputElement) outputElement.innerHTML = '<span class="animate-pulse">Executing AI analysis... Stand by.</span>';
+    try {
+      const response = await fetch('/.netlify/functions/ai-handler', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: 'default', systemPrompt, userPrompt })
+      });
+      if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+      const result = await response.json();
+      if (outputElement) outputElement.textContent = result.text || 'Analysis inconclusive. Please retry.';
+    } catch (error) {
+      console.error('Gemini Call Failed:', error);
+      if (outputElement) outputElement.textContent = 'ERROR: AI core connection failed. Check console for intel.';
+    }
+  }
+
+  async function fetchMarketIntel() {
+    try {
+      const response = await fetch('/.netlify/functions/ai-handler', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: 'getMarketIntel' })
+});
+      if (!response.ok) throw new Error(`API failed with status: ${response.status}`);
+      S.data.allLaptops = await response.json();
+      console.log('Live market intel acquired.');
+    } catch (error) {
+      console.error('Could not fetch live market intel, using fallback data.', error);
+      S.data.allLaptops = S.data.fallbackLaptops;
+    }
+  }
+
+  async function fetchFutureIntel() {
+    try {
+   const response = await fetch('/.netlify/functions/ai-handler', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: 'getFutureIntel' })
+});
+      if (!response.ok) throw new Error(`API failed with status: ${response.status}`);
+      const { intelligence } = await response.json();
+      intelligence.forEach((item, index) => {
+        const t = document.getElementById(`intel-${index}-title`);
+        const s = document.getElementById(`intel-${index}-summary`);
+        const v = document.getElementById(`intel-${index}-verdict`);
+        const w = document.getElementById(`intel-${index}-window`);
+        if (t) t.textContent = item.title;
+        if (s) s.textContent = item.summary;
+        if (v) v.textContent = item.verdict;
+        if (w) w.textContent = item.window;
+      });
+      console.log('Live future intel acquired.');
+    } catch (error) {
+      console.error('Could not fetch future intel.', error);
+      const t0 = document.getElementById('intel-0-title');
+      const s0 = document.getElementById('intel-0-summary');
+      if (t0) t0.textContent = 'Intel Feed Offline';
+      if (s0) s0.textContent = 'Could not establish connection to the live intelligence core. Displaying static data.';
+    }
+  }
+
+  // --- INITIALIZATION -------------------------------------------------------
+  async function initialize() {
+    configureCharts();
+    await Promise.all([fetchMarketIntel(), fetchFutureIntel()]);
+
+    // derive
+    S.data.allLaptops.forEach(l => l.value_rating = (l.score * 100) / l.price);
+    S.data.sortedByRank = [...S.data.allLaptops]
+      .sort((a, b) => b.score - a.score)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    // populate brand filter
+    const brandSelect = document.getElementById('brand-filter');
+    if (brandSelect) {
+      brandSelect.innerHTML += [...new Set(S.data.allLaptops.map(l => l.brand))]
+        .sort()
+        .map(b => `<option value="${b}">${b}</option>`)
+        .join('');
+    }
+
+    // populate radar selection buttons
+    const selector = document.getElementById('laptop-selector-container');
+    if (selector) {
+      selector.innerHTML = S.data.sortedByRank.map(l => {
+        const escapedModel = l.model.replace(/"/g, '&quot;');
+        return `<button class="filter-button radar-selector border border-[var(--c-border)] px-2 py-1 text-xs rounded-md truncate" data-model="${escapedModel}" title="${escapedModel}">${l.model}</button>`;
+      }).join('');
+    }
+
+    renderFilteredData();
+    renderRadarChart();
+    renderToolkitConsole('deal-assassin'); // default
+    setupEventListeners();
+  }
+
+  // --- SERVICE WORKER REGISTRATION -----------------------------------------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(() => console.log('Service Worker registered.'))
+        .catch(err => console.log(`Service Worker registration failed: ${err}`));
+    });
+  }
+
+  // --- BOOTSTRAP ------------------------------------------------------------
+  document.addEventListener('DOMContentLoaded', initialize);
+})();
+</script>
+</body>
+</html>
